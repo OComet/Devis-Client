@@ -149,12 +149,12 @@ pre.txt{background:var(--surface2);border:1px solid var(--border);border-radius:
       <div>
         <label class="f" for="c-mode">Environnement</label>
         <select class="f" id="c-mode" onchange="saveConfig()">
-          <option value="webhook-test">Test (bouton « Test workflow » actif dans n8n)</option>
-          <option value="webhook">Production (workflow publié)</option>
+          <option value="webhook">Production (workflows publiés)</option>
+          <option value="webhook-test">Test (bouton « Test workflow » à cliquer dans n8n)</option>
         </select>
       </div>
     </div>
-    <p class="hint">Les deux workflows sont aujourd'hui inactifs : en mode Test, il faut cliquer « Test workflow » dans n8n juste avant chaque envoi.</p>
+    <p class="hint">Les workflows sont publiés : le mode Production fonctionne directement. Le mode Test sert à voir l'exécution pas à pas dans n8n, en cliquant « Test workflow » juste avant l'envoi.</p>
     <div style="margin-top:10px"><button class="btn-p" onclick="saveConfig(true)"><i class="ti ti-check"></i> Enregistrer</button></div>
   </div>
 
