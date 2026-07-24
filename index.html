@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Proto Process / Analyse dossier client — v0.5 — 24/07/2026</title>
+<title>Proto Process / Analyse dossier client — v0.7 — 24/07/2026</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tabler-icons/2.44.0/iconfont/tabler-icons.min.css">
 <style>
 :root{
@@ -99,7 +99,7 @@ ul.li li.warn::before{background:var(--amber)}
 
 table{width:100%;border-collapse:collapse;font-size:12px}
 th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--text3);
-  padding:7px 9px;border-bottom:1px solid var(--border2);white-space:nowrap;position:sticky;top:52px;background:var(--surface)}
+  padding:7px 9px;border-bottom:1px solid var(--border2);white-space:nowrap;position:sticky;top:0;background:var(--surface);z-index:5}
 td{padding:7px 9px;border-bottom:1px solid var(--border);vertical-align:top}
 tr:hover td{background:var(--surface2)}
 td.mono{font-family:var(--mono);font-size:11.5px}
@@ -118,6 +118,9 @@ pre.txt{background:var(--surface2);border:1px solid var(--border);border-radius:
 @keyframes sp{to{transform:rotate(360deg)}}
 .hint{font-size:11px;color:var(--text3);margin-top:5px}
 .hidden{display:none!important}
+.filter-btn{border:1px solid var(--border);background:var(--surface);color:var(--text2);border-radius:20px;padding:5px 12px;font-size:11.5px;cursor:pointer;font-family:var(--sans)}
+.filter-btn.active{background:var(--accent);color:#fff;border-color:transparent}
+.mode-btn{border-radius:6px;padding:6px 14px;font-size:12.5px}
 .tabs{display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:14px}
 .tab{padding:11px 18px;color:var(--text3);border-bottom:2px solid transparent;cursor:pointer;font-size:12.5px;background:none;border-top:none;border-left:none;border-right:none;font-family:var(--sans)}
 .tab.active{color:var(--accent);border-bottom-color:var(--accent)}
@@ -132,7 +135,7 @@ pre.txt{background:var(--surface2);border:1px solid var(--border);border-radius:
     <span class="logo-text"><span class="lt">PROTO PROCESS</span><span class="ls">/</span><span class="lo">Analyse dossier client</span></span>
   </div>
   <div class="spacer"></div>
-  <span class="hdr-note" id="hdr-version">v0.5 — 24/07/2026</span>
+  <span class="hdr-note" id="hdr-version">v0.7 — 24/07/2026</span>
   <span class="hdr-note" id="hdr-mode" style="margin-left:10px">mode test</span>
   <button class="btn-s" onclick="toggleConfig()"><i class="ti ti-settings"></i> Réglages</button>
 </header>
@@ -168,8 +171,8 @@ pre.txt{background:var(--surface2);border:1px solid var(--border);border-radius:
         <label class="f" for="f-client">Client</label>
         <div style="display:flex;gap:6px">
           <select class="f" id="f-client" onchange="onClientChange()"><option value="">— chargement…</option></select>
-          <button class="btn-s" onclick="ouvrirFiche()" title="Ajouter ou modifier un client"><i class="ti ti-user-edit"></i></button>
-          <button class="btn-s" onclick="chargerClients()" title="Recharger la liste"><i class="ti ti-refresh"></i></button>
+          <button class="btn-s" onclick="ouvrirFiche()" title="Ajouter ou modifier un client"><i class="ti ti-address-book"></i> Ajouter client</button>
+          <button class="btn-s" onclick="chargerClients()" title="Recharger la liste"><i class="ti ti-refresh"></i> Recharger</button>
         </div>
         <div class="hint" id="client-hint"></div>
       </div>
@@ -180,17 +183,11 @@ pre.txt{background:var(--surface2);border:1px solid var(--border);border-radius:
       </div>
       <div>
         <label class="f">Type d'analyse</label>
-        <div style="display:flex;gap:16px;padding:6px 0;flex-wrap:wrap">
-          <label style="display:flex;align-items:center;gap:7px;font-size:12.5px;cursor:pointer">
-            <input type="checkbox" id="f-complet" checked onchange="onModeChange()" style="accent-color:var(--accent);width:15px;height:15px">
-            Dossier complet
-          </label>
-          <label style="display:flex;align-items:center;gap:7px;font-size:12.5px;cursor:pointer">
-            <input type="checkbox" id="f-bom-seule" onchange="onModeChange()" style="accent-color:var(--accent);width:15px;height:15px">
-            Nomenclature
-          </label>
+        <div style="display:flex;gap:0;padding:2px 0" role="radiogroup">
+          <button type="button" class="filter-btn mode-btn active" id="btn-mode-complet" onclick="setMode('complet')">Dossier complet</button>
+          <button type="button" class="filter-btn mode-btn" id="btn-mode-bom" onclick="setMode('bom')" style="margin-left:6px">Nomenclature</button>
         </div>
-        <div class="hint" id="mode-hint"></div>
+        <div class="hint" id="mode-hint">Gerber, plans, mail, nomenclature</div>
       </div>
     </div>
 
@@ -243,6 +240,7 @@ pre.txt{background:var(--surface2);border:1px solid var(--border);border-radius:
     <i class="ti ti-file-check" style="color:var(--text2)"></i>
     <span class="t" id="summary-txt"></span>
     <button class="btn-s" onclick="rouvrir()"><i class="ti ti-edit"></i> Modifier</button>
+    <button class="btn-p" onclick="nouvelleAnalyse()"><i class="ti ti-plus"></i> Nouvelle analyse</button>
   </div>
 
   <!-- RÉSULTATS -->
@@ -303,28 +301,27 @@ function renderFiles(){
       <i class="ti ti-x x" onclick="removeFile(${i})"></i></span>`).join('');
   majBouton();
 }
+let MODE = 'complet'; // 'complet' | 'bom' — l'un OU l'autre, jamais les deux
+function setMode(m){
+  MODE = m;
+  document.getElementById('btn-mode-complet').classList.toggle('active', m==='complet');
+  document.getElementById('btn-mode-bom').classList.toggle('active', m==='bom');
+  onModeChange();
+}
 function onModeChange(){
-  const complet = document.getElementById('f-complet').checked;
-  const bom = document.getElementById('f-bom-seule').checked;
   const h = document.getElementById('mode-hint');
-  const seulBom = bom && !complet;
+  const seulBom = MODE === 'bom';
 
   dz.querySelector('p').textContent = seulBom ? 'Déposer la nomenclature' : 'Déposer les fichiers du dossier';
   dz.querySelector('.sub').textContent = seulBom
     ? 'Un seul fichier xlsx ou csv'
     : 'Zip, ou plusieurs fichiers séparés — Gerber, nomenclature, pick & place, plans PDF, mail .eml';
 
-  if(!complet && !bom) h.innerHTML = '<span style="color:var(--amber)">Cocher au moins une case</span>';
-  else if(complet && bom) h.textContent = 'Dossier complet — la nomenclature y est incluse';
-  else if(complet) h.textContent = 'Gerber, plans, mail, nomenclature';
-  else h.textContent = 'Nomenclature uniquement, sans analyse PCB';
-
+  h.textContent = seulBom ? 'Nomenclature uniquement, sans analyse PCB' : 'Gerber, plans, mail, nomenclature';
   majBouton();
 }
 function majBouton(){
-  const complet = document.getElementById('f-complet').checked;
-  const bom = document.getElementById('f-bom-seule').checked;
-  document.getElementById('go').disabled = FILES.length === 0 || (!complet && !bom);
+  document.getElementById('go').disabled = FILES.length === 0;
 }
 
 /* ---------- liste des clients ---------- */
@@ -374,9 +371,10 @@ function onClientChange(){
 function ouvrirFiche(){
   const nom = document.getElementById('f-client').value;
   const i = nom ? infoClient(nom) : null;
-  document.getElementById('fc-nom').value = nom || '';
-  document.getElementById('fc-dom').value = i ? (i.domaine||'') : '';
-  document.getElementById('fc-lang').value = i ? (i.langue||'') : '';
+  const nouveau = !nom && DETECTION_INCONNUE;
+  document.getElementById('fc-nom').value = nom || (nouveau ? DETECTION_INCONNUE.nom||'' : '');
+  document.getElementById('fc-dom').value = i ? (i.domaine||'') : (nouveau ? DETECTION_INCONNUE.domaine||'' : '');
+  document.getElementById('fc-lang').value = i ? (i.langue||'FR') : 'FR'; // FR par defaut pour un client nouveau
   document.getElementById('fc-mpn').value = i ? (i.mpn_strict?'oui':'non') : '';
   document.getElementById('fc-notes').value = i ? (i.notes||'') : '';
   document.getElementById('fc-status').textContent = '';
@@ -412,7 +410,7 @@ async function enregistrerFiche(){
 /* ---------- envoi ---------- */
 async function analyser(){
   const c = cfg();
-  const modeBom = document.getElementById('f-bom-seule').checked && !document.getElementById('f-complet').checked;
+  const modeBom = MODE === 'bom';
   const chemin = modeBom ? 'bom-client-ingestion' : 'dossier-triage-pcb';
   const url = `${c.base}/${c.mode}/${chemin}`;
 
@@ -517,6 +515,7 @@ async function suivreJob(job, nb){
 }
 
 /* Reprend ce que l'analyse a detecte quand l'utilisateur n'avait rien saisi */
+let DETECTION_INCONNUE = null;
 function appliquerDetections(){
   const d = DATA||{};
   const selC = document.getElementById('f-client');
@@ -525,8 +524,11 @@ function appliquerDetections(){
     const opt = [...selC.options].find(o=>o.value.toLowerCase()===String(detecte).toLowerCase());
     if(opt){ selC.value = opt.value;
       document.getElementById('client-hint').innerHTML = `<span style="color:var(--green)">détecté : ${esc(detecte)}</span>`; }
-    else document.getElementById('client-hint').innerHTML =
-      `<span style="color:var(--amber)">détecté « ${esc(detecte)} » — absent de la liste</span>`;
+    else{
+      DETECTION_INCONNUE = { nom: detecte, domaine: d.mail_domaine || '' };
+      document.getElementById('client-hint').innerHTML =
+        `<span style="color:var(--amber)">détecté « ${esc(detecte)} » — absent de la liste. <a href="#" onclick="ouvrirFiche();return false" style="color:var(--accent)">Ajouter ce client</a></span>`;
+    }
   }
   const inR = document.getElementById('f-ref');
   const ref = d.ref_projet || d.objet;
@@ -546,6 +548,21 @@ function replier(){
 function rouvrir(){
   document.getElementById('depot').classList.remove('hidden');
   document.getElementById('summary').style.display='none';
+}
+function nouvelleAnalyse(){
+  FILES = []; DATA = null; BOM_FILTER = 'tous';
+  renderFiles();
+  document.getElementById('f-ref').value = '';
+  document.getElementById('f-client').value = '';
+  document.getElementById('f-mail').value = '';
+  document.getElementById('client-hint').textContent = '';
+  document.getElementById('ref-hint').textContent = '';
+  document.getElementById('status').textContent = '';
+  document.getElementById('res').classList.add('hidden');
+  document.getElementById('depot').classList.remove('hidden');
+  document.getElementById('summary').style.display='none';
+  tab('synthese');
+  window.scrollTo({top:0, behavior:'smooth'});
 }
 function tab(p){
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.p===p));
@@ -630,6 +647,27 @@ function afficher(){
   tab('synthese');
 }
 
+const LIBELLE_CHAMP = {
+  client_detecte:'Client', ref_projet:'Réf. projet', pcb_fourni_par_client:'PCB fourni par le client',
+  couches:'Couches', percage_mini_mm:'Perçage mini', piste_mini_um:'Piste mini', isolement_mini_um:'Isolement mini',
+  vias_borgnes:'Vias borgnes', vias_enterres:'Vias enterrés', epaisseur_mm:'Épaisseur', finition:'Finition',
+  materiau:'Matériau', classe_ipc:'Classe IPC', impedance_controlee:'Impédance contrôlée', vernis_epargne:'Vernis épargne',
+  'demande.quantites':'Quantités', 'demande.delai_souhaite':'Délai souhaité', 'demande.type_prestation':'Prestation',
+  'demande.consignation':'Consignation', autres_exigences:'Autres exigences'
+};
+function fusionnerSources(sources){
+  const s = sources.slice();
+  const iL = s.findIndex(x=>x.champ==='largeur_mm'), iH = s.findIndex(x=>x.champ==='hauteur_mm');
+  if(iL>-1 && iH>-1){
+    const L = s[iL], H = s[iH];
+    const meme = L.document===H.document && L.emplacement===H.emplacement;
+    s.splice(Math.max(iL,iH),1); s.splice(Math.min(iL,iH),1,{
+      champ:'dimensions (L x H)', document: L.document,
+      emplacement: meme ? L.emplacement : [L.emplacement,H.emplacement].filter(Boolean).join(' ; ')
+    });
+  }
+  return s.map(x=>({...x, champ: LIBELLE_CHAMP[x.champ] || x.champ}));
+}
 function synthDossier(d){
   const v = VERDICT[d.decision_pcb] || {cls:'',ico:'ti-help-circle',t:d.decision_pcb||'—',s:''};
   const dem = d.demande || {};
@@ -656,13 +694,43 @@ function synthDossier(d){
 
   // complétude
   const manque = d.pieces_manquantes||[];
-  h += `<div class="card ${manque.length?'warn':'ok'}"><h2><i class="ti ti-checklist"></i> Complétude du dossier
-      ${manque.length?'<span class="badge b-warn">incomplet</span>':'<span class="badge b-ok">complet</span>'}</h2>`;
-  if(manque.length) h += `<ul class="li">${manque.map(m=>`<li class="warn">Manque : ${esc(m)}</li>`).join('')}</ul>`;
   const inv = d.inventaire||{};
-  h += `<div style="margin-top:9px">` + Object.keys(inv).filter(k=>(inv[k]||[]).length).map(k=>
-      `<div class="kv"><span class="k">${esc(k.replace(/_/g,' '))}</span><span class="mono" style="font-family:var(--mono);font-size:11px;color:var(--text2)">${esc((inv[k]||[]).join(', '))}</span></div>`).join('')
-    + `</div></div>`;
+  const okBadge = `<span style="display:inline-flex;align-items:center;justify-content:center;width:19px;height:19px;border-radius:4px;background:var(--green-bg);color:var(--green-badge);font-weight:700;font-size:12px;line-height:1;flex:none">&#10003;</span>`;
+  const koBadge = `<span style="display:inline-flex;align-items:center;justify-content:center;width:19px;height:19px;border-radius:4px;background:var(--red-bg);color:var(--red-badge);font-weight:700;font-size:12px;line-height:1;flex:none">&#10007;</span>`;
+  const naBadge = `<span style="display:inline-flex;align-items:center;justify-content:center;width:19px;height:19px;border-radius:4px;background:var(--surface2);color:var(--text3);font-weight:700;font-size:12px;line-height:1;flex:none">&ndash;</span>`;
+
+  const PIECES = [
+    {cle:'gerbers',        libelle:'fichiers Gerber'},
+    {cle:'bom',            libelle:'nomenclature (BOM)'},
+    {cle:'pick_and_place', libelle:'fichier de pose (pick & place)'},
+    {cle:'plans',          libelle:'plans / documents PDF'}
+  ];
+  h += `<div class="card ${manque.length?'warn':'ok'}"><h2><i class="ti ti-checklist"></i> Complétude du dossier
+      ${manque.length?'<span class="badge b-warn">incomplet</span>':'<span class="badge b-ok">complet</span>'}</h2>
+    <div style="display:flex;flex-direction:column;gap:7px">`;
+  for(const p of PIECES){
+    const sansObjet = d.pcb_fourni_par_client && p.cle==='gerbers';
+    const present = !manque.includes(p.libelle);
+    let fichiers = (inv[p.cle]||[]).slice();
+    if(p.cle==='plans') fichiers = fichiers.concat(inv.specs||[], inv.documents_a_lire||[]);
+    const badge = sansObjet ? naBadge : (present ? okBadge : koBadge);
+    const detail = sansObjet
+      ? `<span style="color:var(--text3)">sans objet — le client fournit les circuits imprimés</span>`
+      : (fichiers.length
+          ? `<span class="mono" style="font-size:11px;color:var(--text2)">${esc(fichiers.join(', '))}</span>`
+          : `<span style="color:var(--red)">absent du dossier</span>`);
+    h += `<div style="display:flex;align-items:flex-start;gap:9px">
+      ${badge}
+      <div style="flex:1;min-width:0">
+        <div style="font-size:12.5px">${esc(p.libelle)}</div>
+        <div style="margin-top:1px">${detail}</div>
+      </div></div>`;
+  }
+  h += `</div>`;
+  const autres = Object.keys(inv).filter(k=>!['gerbers','bom','pick_and_place','plans','specs','documents_a_lire'].includes(k) && (inv[k]||[]).length);
+  if(autres.length) h += `<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">` +
+    autres.map(k=>`<div class="kv"><span class="k">${esc(k.replace(/_/g,' '))}</span><span class="mono" style="font-size:11px;color:var(--text2)">${esc((inv[k]||[]).join(', '))}</span></div>`).join('') + `</div>`;
+  h += `</div>`;
 
   // exigences
   const ex = (d.exigences_montage||[]).concat(d.autres_exigences||[]);
@@ -670,8 +738,17 @@ function synthDossier(d){
     <ul class="li">${ex.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>`;
 
   // sources
-  if((d.sources||[]).length) h += `<div class="card"><h2><i class="ti ti-search"></i> Où vérifier dans le dossier</h2>
-    <ul class="li">${d.sources.map(s=>`<li><strong>${esc(s.champ)}</strong> — ${esc(s.document)}${s.emplacement?', '+esc(s.emplacement):''}</li>`).join('')}</ul></div>`;
+  if((d.sources||[]).length) h += `<div class="card"><h2><i class="ti ti-search"></i> Sources</h2>
+    <table style="width:100%;border-collapse:collapse">
+      <thead><tr>
+        <th style="text-align:left;font-size:10.5px;text-transform:uppercase;color:var(--text3);padding:5px 8px;border-bottom:1px solid var(--border2)">Champ</th>
+        <th style="text-align:left;font-size:10.5px;text-transform:uppercase;color:var(--text3);padding:5px 8px;border-bottom:1px solid var(--border2)">Où vérifier</th>
+      </tr></thead>
+      <tbody>${fusionnerSources(d.sources).map(s=>
+        `<tr><td style="padding:6px 8px;border-bottom:1px solid var(--border);font-weight:500;white-space:nowrap;vertical-align:top">${esc(s.champ)}</td>
+         <td style="padding:6px 8px;border-bottom:1px solid var(--border);color:var(--text2)">${esc(s.document)}${s.emplacement?' — '+esc(s.emplacement):''}</td></tr>`
+      ).join('')}</tbody>
+    </table></div>`;
 
   // questions
   if((d.questions_client||[]).length) h += `<div class="card warn"><h2><i class="ti ti-message-question"></i> À clarifier avec le client</h2>
@@ -695,20 +772,39 @@ function synthBom(d){
   return h;
 }
 
+let BOM_FILTER = 'tous';
+function setBomFilter(f){ BOM_FILTER = f; document.getElementById('p-bom').innerHTML = tableBom(DATA); }
+function correspondFiltre(l, f){
+  if(f==='tous') return true;
+  if(f==='incertain') return l.confiance==='low';
+  if(f==='nc') return !!l.a_ne_pas_cabler;
+  return l.voie === f;
+}
 function tableBom(d){
-  const lignes = d.bom_lignes || d.lignes || [];
+  const toutes = d.bom_lignes || d.lignes || [];
   const b64 = d.bom_xlsx_base64, nom = d.bom_xlsx_nom || 'BOM_traitee_Luminovo.xlsx';
   let h = `<div class="card"><h2><i class="ti ti-table"></i> Nomenclature traitée
       <span style="flex:1"></span></h2>`;
   if(b64) h += `<div style="margin-bottom:12px"><button class="btn-p" onclick="dl()"><i class="ti ti-download"></i> Télécharger ${esc(nom)}</button>
      <span class="hint" style="display:inline;margin-left:9px">Colonnes d'origine intactes + IPN + Statut PP</span></div>`;
-  else h += `<p class="hint" style="margin-bottom:10px">Aucun fichier xlsx retourné.</p>`;
+  else if(toutes.length) h += `<p class="hint" style="margin-bottom:10px">Aucun fichier xlsx retourné.</p>`;
 
-  if(!lignes.length){ return h + `<p style="color:var(--text3)">Aucune ligne à afficher.</p></div>`; }
+  if(!toutes.length){ return h + `<p style="color:var(--text3)">Aucune ligne à afficher.</p></div>`; }
 
+  const compte = f => toutes.filter(l=>correspondFiltre(l,f)).length;
+  const pills = [
+    ['tous','Toutes'],['MPN','MPN'],['CODIFIE','Codifiées'],['REPLI_STOCK','Repli stock'],
+    ['PCB','PCB'],['nc','Non câblées'],['incertain','Confiance faible']
+  ].filter(([f])=>f==='tous'||compte(f)>0);
+  h += `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">` +
+    pills.map(([f,lbl])=>`<button class="filter-btn${BOM_FILTER===f?' active':''}" onclick="setBomFilter('${f}')">${esc(lbl)} <span style="opacity:.7">${compte(f)}</span></button>`).join('') +
+    `</div>`;
+
+  const lignes = toutes.filter(l=>correspondFiltre(l,BOM_FILTER));
   h += `<div class="tblwrap"><table><thead><tr>
     <th>Repères</th><th>Famille</th><th>Valeur</th><th>Boîtier</th>
     <th>MPN client</th><th>IPN proposé</th><th>Statut</th><th>Confiance</th></tr></thead><tbody>`;
+  if(!lignes.length) h += `<tr><td colspan="8" style="color:var(--text3);text-align:center;padding:20px">Aucune ligne pour ce filtre.</td></tr>`;
   for(const l of lignes){
     const st = statutLigne(l);
     const cellCls = st.niveau==='err'?'errcell':st.niveau==='warn'?'warncell':'';
@@ -729,7 +825,7 @@ function statutLigne(l){
   if(l.voie==='REPLI_STOCK' && !l.ipn_propose)
     return {niveau:'err', html:`<span class="badge b-err">à traiter</span> <span style="color:var(--text3)">${esc(l.repli_motif||'')}</span>`};
   if(l.voie==='REPLI_STOCK')
-    return {niveau:'warn', html:`<span class="badge b-warn">NOK devis</span> <span style="color:var(--text3)">manque ${esc((l.champs_manquants||[]).join(', '))}</span>`};
+    return {niveau:'warn', html:`<span class="badge b-warn">NOK commande</span> <span style="color:var(--text3)">manque ${esc((l.champs_manquants||[]).join(', '))}</span>`};
   if(l.est_pcb) return {niveau:'warn', html:`<span class="badge b-info">circuit imprimé</span>`};
   if(l.a_ne_pas_cabler) return {niveau:'warn', html:`<span class="badge b-info">non câblé</span>`};
   if(l.voie==='CODIFIE') return {niveau:'ok', html:`<span class="badge b-ok">codifiée</span>`};
@@ -743,14 +839,57 @@ function badgeConf(c){
   return '';
 }
 
+/* Transforme le texte brut genere par n8n (titres MAJUSCULES, lignes [ref] ...,
+   sous-lignes indentees) en document lisible, sans toucher au texte copiable. */
+function prettifierFiche(texte){
+  const lignes = String(texte||'').split('\n');
+  const out = []; let enListe = false;
+  const fermerListe = ()=>{ if(enListe){ out.push('</ul>'); enListe=false; } };
+  for(const brute of lignes){
+    const l = brute.replace(/\r$/,'');
+    if(!l.trim()){ continue; }
+    const estTitrePrincipal = out.length===0 && !/^[-\s]/.test(l);
+    const estTitreSection = /^[A-ZÀ-Ü0-9][A-ZÀ-Ü0-9 '().\-]{3,}$/.test(l.trim()) && l.trim()===l.trim().toUpperCase();
+    const estSousLigne = /^\s{6}/.test(brute);
+    const estItem = /^\s{2}\[/.test(brute) || /^\s{2}\d+\./.test(brute) || /^\s{2}\S/.test(brute);
+    if(estTitrePrincipal){ out.push(`<h3 style="font-size:15px;margin:0 0 3px">${esc(l)}</h3>`); continue; }
+    if(/^Genere le /.test(l.trim())){ out.push(`<p style="color:var(--text3);font-size:11.5px;margin-bottom:14px">${esc(l.trim())}</p>`); continue; }
+    if(estTitreSection){ fermerListe(); out.push(`<h4 style="font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--accent);margin:18px 0 8px;border-bottom:1px solid var(--border);padding-bottom:5px">${esc(l.trim())}</h4>`); continue; }
+    if(estSousLigne){
+      const note = `<div style="color:var(--text3);font-size:11.5px;margin-top:2px">${esc(l.trim())}</div>`;
+      if(enListe && out.length && out[out.length-1].endsWith('</li>')){
+        out[out.length-1] = out[out.length-1].replace(/<\/li>$/, note+'</li>');
+      } else out.push(`<div style="color:var(--text3);font-size:11.5px;margin:0 0 8px 16px">${esc(l.trim())}</div>`);
+      continue;
+    }
+    if(estItem){
+      if(!enListe){ out.push('<ul class="li">'); enListe=true; }
+      const m = l.trim().match(/^\[([^\]]+)\]\s*(.*)$/);
+      out.push(m ? `<li><strong>${esc(m[1])}</strong> — ${esc(m[2])}</li>` : `<li>${esc(l.trim())}</li>`);
+      continue;
+    }
+    fermerListe();
+    out.push(`<p style="margin:0 0 8px">${esc(l.trim())}</p>`);
+  }
+  fermerListe();
+  return out.join('\n');
+}
 function brut(d){
   let h='';
-  if(d.fiche_texte) h += `<div class="card"><h2><i class="ti ti-file-description"></i> Fiche de dossier</h2>
-    <pre class="txt">${esc(d.fiche_texte)}</pre>
-    <div style="margin-top:10px"><button class="btn-s" onclick="copier('fiche_texte')"><i class="ti ti-copy"></i> Copier</button></div></div>`;
-  if(d.bom_fiche_texte) h += `<div class="card"><h2><i class="ti ti-file-description"></i> Fiche nomenclature</h2>
-    <pre class="txt">${esc(d.bom_fiche_texte)}</pre>
-    <div style="margin-top:10px"><button class="btn-s" onclick="copier('bom_fiche_texte')"><i class="ti ti-copy"></i> Copier</button></div></div>`;
+  if(d.fiche_texte) h += `<div class="card">
+    <div style="display:flex;align-items:center;margin-bottom:4px">
+      <h2 style="margin:0"><i class="ti ti-file-description"></i> Fiche de dossier</h2>
+      <span style="flex:1"></span>
+      <button class="btn-s" onclick="copier('fiche_texte')"><i class="ti ti-copy"></i> Copier le texte</button>
+    </div>
+    <div style="line-height:1.55">${prettifierFiche(d.fiche_texte)}</div></div>`;
+  if(d.bom_fiche_texte) h += `<div class="card">
+    <div style="display:flex;align-items:center;margin-bottom:4px">
+      <h2 style="margin:0"><i class="ti ti-file-description"></i> Fiche nomenclature</h2>
+      <span style="flex:1"></span>
+      <button class="btn-s" onclick="copier('bom_fiche_texte')"><i class="ti ti-copy"></i> Copier le texte</button>
+    </div>
+    <div style="line-height:1.55">${prettifierFiche(d.bom_fiche_texte)}</div></div>`;
   return h || `<div class="card"><p style="color:var(--text3)">Aucune fiche texte retournée.</p></div>`;
 }
 
