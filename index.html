@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Proto Process / Analyse dossier client — v0.9 — 24/07/2026</title>
+<title>Proto Process / Analyse dossier client — v1.0 — 24/07/2026</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tabler-icons/2.44.0/iconfont/tabler-icons.min.css">
 <style>
 :root{
@@ -121,6 +121,27 @@ pre.txt{background:var(--surface2);border:1px solid var(--border);border-radius:
 .filter-btn{border:1px solid var(--border);background:var(--surface);color:var(--text2);border-radius:20px;padding:5px 12px;font-size:11.5px;cursor:pointer;font-family:var(--sans)}
 .filter-btn.active{background:var(--accent);color:#fff;border-color:transparent}
 .mode-btn{border-radius:6px;padding:6px 14px;font-size:12.5px}
+@media print{
+  @page{ size:A4; margin:14mm 12mm; }
+  html,body{ background:#fff!important; color:#111!important; font-size:10.5pt }
+  header,.tabs,#depot,#summary,#config,#fiche-client,.btn-p,.btn-s,.filter-btn{ display:none!important }
+  .wrap{ max-width:none;padding:0 }
+  #p-bom,#p-brut{ display:none!important }
+  #p-synthese{ display:block!important }
+  .card{ background:#fff!important;border:1px solid #bbb!important;break-inside:avoid;page-break-inside:avoid;margin-bottom:9px;padding:10px }
+  .card h2,h3,h4{ color:#111!important }
+  .card h2 i{ display:none }
+  .kv .k{ color:#555!important }
+  td,th,li,p,div,span{ color:#222!important }
+  .mono{ color:#333!important }
+  .badge{ border:1px solid #999 }
+  #print-entete{ display:block!important;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid #333 }
+  #print-bom{ display:block!important }
+  table{ page-break-inside:auto }
+  tr{ page-break-inside:avoid }
+  thead{ display:table-header-group }
+}
+#print-entete,#print-bom{ display:none }
 .tabs{display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:14px}
 .tab{padding:11px 18px;color:var(--text3);border-bottom:2px solid transparent;cursor:pointer;font-size:12.5px;background:none;border-top:none;border-left:none;border-right:none;font-family:var(--sans)}
 .tab.active{color:var(--accent);border-bottom-color:var(--accent)}
@@ -135,7 +156,7 @@ pre.txt{background:var(--surface2);border:1px solid var(--border);border-radius:
     <span class="logo-text"><span class="lt">PROTO PROCESS</span><span class="ls">/</span><span class="lo">Analyse dossier client</span></span>
   </div>
   <div class="spacer"></div>
-  <span class="hdr-note" id="hdr-version">v0.9 — 24/07/2026</span>
+  <span class="hdr-note" id="hdr-version">v1.0 — 24/07/2026</span>
   <span class="hdr-note" id="hdr-mode" style="margin-left:10px">mode test</span>
   <button class="btn-s" onclick="toggleConfig()"><i class="ti ti-settings"></i> Réglages</button>
 </header>
@@ -240,6 +261,7 @@ pre.txt{background:var(--surface2);border:1px solid var(--border);border-radius:
     <i class="ti ti-file-check" style="color:var(--text2)"></i>
     <span class="t" id="summary-txt"></span>
     <button class="btn-s" onclick="rouvrir()"><i class="ti ti-edit"></i> Modifier</button>
+    <button class="btn-s" onclick="exporterPdf()"><i class="ti ti-file-type-pdf"></i> Exporter en PDF</button>
     <button class="btn-p" onclick="nouvelleAnalyse()"><i class="ti ti-plus"></i> Nouvelle analyse</button>
   </div>
 
@@ -250,7 +272,9 @@ pre.txt{background:var(--surface2);border:1px solid var(--border);border-radius:
       <button class="tab" data-p="bom" onclick="tab('bom')">Nomenclature</button>
       <button class="tab" data-p="brut" onclick="tab('brut')">Fiches texte</button>
     </div>
-    <div id="p-synthese"></div>
+    <div id="print-entete"></div>
+  <div id="p-synthese"></div>
+  <div id="print-bom"></div>
     <div id="p-bom" class="hidden"></div>
     <div id="p-brut" class="hidden"></div>
   </div>
@@ -492,16 +516,24 @@ async function suivreJob(job, nb){
   const monId = ANALYSE_ID;
   const zone = document.getElementById('p-bom');
   const t0 = Date.now();
+  let echecs = 0, dernierEchec = '';
   for(let i=0;i<90;i++){
-    if(monId !== ANALYSE_ID) return;   // une autre analyse a demarre
+    if(monId !== ANALYSE_ID) return;
     const sec = Math.round((Date.now()-t0)/1000);
     zone.innerHTML = `<div class="card"><h2><i class="ti ti-table"></i> Nomenclature</h2>
-      <p style="color:var(--text2)"><span class="spin"></span> Traitement de ${nb} lignes en cours\u2026 ${sec} s</p></div>`;
+      <p style="color:var(--text2)"><span class="spin"></span> Traitement de ${nb||'?'} lignes en cours… ${sec} s</p>
+      ${echecs?`<p class="hint" style="color:var(--amber)">${echecs} tentative(s) de récupération en échec — ${esc(dernierEchec)}</p>`:''}
+      <p class="hint">Identifiant de traitement : ${esc(job||'—')}</p></div>`;
     await new Promise(res=>setTimeout(res, 4000));
-    let rr; try{ rr = await fetch(`${c.base}/webhook/v2-bom-resultat?job=`+encodeURIComponent(job)); }catch(e){ continue; }
-    if(!rr.ok) continue;
-    const jj = await rr.json();
-    const d = Array.isArray(jj) ? (jj[0]||{}) : jj;
+    let rr;
+    try{ rr = await fetch(`${c.base}/webhook/v2-bom-resultat?job=`+encodeURIComponent(job)); }
+    catch(e){ echecs++; dernierEchec = 'appel bloqué : '+e.message; continue; }
+    if(!rr.ok){ echecs++; dernierEchec = 'HTTP '+rr.status; continue; }
+    let d;
+    try{
+      const jj = await rr.json();
+      d = Array.isArray(jj) ? (jj[0]||{}) : jj;
+    }catch(e){ echecs++; dernierEchec = 'réponse illisible : '+e.message; continue; }
     if(d.statut === 'termine'){
       DATA.bom_lignes = d.lignes || [];
       DATA.bom_totaux = d.totaux || null;
@@ -509,13 +541,23 @@ async function suivreJob(job, nb){
       DATA.bom_fiche_texte = d.fiche_texte || '';
       DATA.bom_xlsx_nom = d.bom_xlsx_nom || null;
       DATA.bom_xlsx_base64 = d.bom_xlsx_base64 || null;
-      document.getElementById('p-synthese').innerHTML = synthBom(DATA.bom_totaux ? {totaux:DATA.bom_totaux, controles_luminovo:DATA.bom_controles_luminovo} : {});
-      zone.innerHTML = tableBom(DATA);
-      document.getElementById('p-brut').innerHTML = brut(DATA);
+      try{
+        document.getElementById('p-synthese').innerHTML = synthBom({totaux:DATA.bom_totaux, controles_luminovo:DATA.bom_controles_luminovo});
+        zone.innerHTML = tableBom(DATA);
+        document.getElementById('p-brut').innerHTML = brut(DATA);
+      }catch(e){
+        zone.innerHTML = `<div class="card err"><p style="color:var(--red)">Résultat reçu mais affichage en erreur : ${esc(e.message)}</p></div>`;
+      }
+      return;
+    }
+    if(d.statut === 'erreur'){
+      zone.innerHTML = `<div class="card err"><p style="color:var(--red)">${esc(d.message||'Erreur de traitement')}</p></div>`;
       return;
     }
   }
-  zone.innerHTML = `<div class="card err"><p style="color:var(--red)">Le traitement depasse six minutes.</p></div>`;
+  zone.innerHTML = `<div class="card err"><h2><i class="ti ti-table"></i> Nomenclature</h2>
+    <p style="color:var(--red)">Résultat non récupéré après six minutes.</p>
+    <p class="hint">Identifiant : ${esc(job)} — ${echecs} échec(s), dernier : ${esc(dernierEchec||'aucun')}</p></div>`;
 }
 
 /* Reprend ce que l'analyse a detecte quand l'utilisateur n'avait rien saisi */
@@ -783,14 +825,17 @@ function synthDossier(d){
   const trouves = CHECKLIST.filter(([,lbl])=>parLibelle[lbl]).length;
   h += `<div class="card"><h2><i class="ti ti-list-check"></i> Sources
       <span class="badge ${trouves===CHECKLIST.length?'b-ok':'b-warn'}">${trouves} / ${CHECKLIST.length} trouvés</span></h2>
-    <div style="display:flex;flex-direction:column;gap:5px">`;
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:4px 18px">`;
   for(const [,lbl] of CHECKLIST){
     const s = parLibelle[lbl];
-    h += `<div style="display:flex;align-items:flex-start;gap:9px;padding:3px 0;border-bottom:1px solid var(--border)">
+    h += `<div style="display:flex;align-items:flex-start;gap:8px;padding:4px 0;border-bottom:1px solid var(--border)">
       ${s?okP:koP}
-      <div style="min-width:150px;font-size:12.5px">${esc(lbl)}</div>
-      <div style="flex:1;min-width:0;font-size:11.5px;color:${s?'var(--text2)':'var(--text3)'}">
-        ${s ? esc(s.document) + (s.emplacement?' — '+esc(s.emplacement):'') : 'non trouvé dans le dossier'}
+      <div style="flex:1;min-width:0">
+        <div style="font-size:12.5px">${esc(lbl)}</div>
+        <div style="font-size:11px;color:${s?'var(--text2)':'var(--text3)'};margin-top:1px"
+             title="${s?esc(s.document+(s.emplacement?' — '+s.emplacement:'')):''}">
+          ${s ? esc(s.document) + (s.emplacement?' — '+esc(s.emplacement):'') : 'non trouvé dans le dossier'}
+        </div>
       </div></div>`;
   }
   // ce qui a ete trouve hors check-list (client, ref projet, demande...)
@@ -952,6 +997,55 @@ function brut(d){
     </div>
     <div style="line-height:1.55">${prettifierFiche(d.bom_fiche_texte)}</div></div>`;
   return h || `<div class="card"><p style="color:var(--text3)">Aucune fiche texte retournée.</p></div>`;
+}
+
+/* ---------- export PDF ---------- */
+function exporterPdf(){
+  const d = DATA || {};
+  const titre = [d.client || d.client_detecte || 'Client non précisé', d.ref_projet || ''].filter(Boolean).join(' — ');
+  document.getElementById('print-entete').innerHTML =
+    `<div style="display:flex;align-items:baseline;gap:10px">
+       <strong style="font-size:15pt">PROTO PROCESS</strong>
+       <span style="font-size:11pt">Analyse de dossier client</span>
+       <span style="flex:1"></span>
+       <span style="font-size:9pt">${esc(new Date().toLocaleString('fr-FR'))}</span>
+     </div>
+     <div style="font-size:12pt;margin-top:3px">${esc(titre)}</div>`;
+
+  // lignes de nomenclature a problemes uniquement
+  const lignes = (d.bom_lignes || d.lignes || []).filter(l =>
+    l.voie === 'REPLI_STOCK' || l.est_pcb || l.a_ne_pas_cabler ||
+    l.confiance === 'low' || l.equivalent_autorise === false || l.fourni_par_client === true);
+
+  let bomHtml = '';
+  if(lignes.length){
+    bomHtml = `<div class="card"><h2>Nomenclature — lignes à traiter (${lignes.length})</h2>
+      <table style="width:100%;border-collapse:collapse;font-size:9pt">
+        <thead><tr>
+          <th style="text-align:left;padding:4px;border-bottom:1px solid #999">Repères</th>
+          <th style="text-align:left;padding:4px;border-bottom:1px solid #999">Description client</th>
+          <th style="text-align:left;padding:4px;border-bottom:1px solid #999">IPN proposé</th>
+          <th style="text-align:left;padding:4px;border-bottom:1px solid #999">À traiter</th>
+        </tr></thead><tbody>`;
+    for(const l of lignes){
+      const st = statutLigne(l);
+      const txt = st.html.replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim();
+      bomHtml += `<tr>
+        <td style="padding:4px;border-bottom:1px solid #ddd;vertical-align:top">${esc((l.designateurs||[]).join(', ')||('ligne '+((l.ligne_index??0)+1)))}</td>
+        <td style="padding:4px;border-bottom:1px solid #ddd;vertical-align:top">${esc(l.description_client||'—')}</td>
+        <td style="padding:4px;border-bottom:1px solid #ddd;vertical-align:top">${esc(l.ipn_propose||'—')}</td>
+        <td style="padding:4px;border-bottom:1px solid #ddd;vertical-align:top">${esc(txt)}</td></tr>`;
+    }
+    bomHtml += `</tbody></table></div>`;
+  } else if((d.bom_lignes||d.lignes||[]).length){
+    bomHtml = `<div class="card"><h2>Nomenclature</h2><p>Aucune ligne à traiter : toutes les lignes sont exploitables en l'état.</p></div>`;
+  }
+  document.getElementById('print-bom').innerHTML = bomHtml;
+
+  const ongletActif = [...document.querySelectorAll('.tab')].find(t=>t.classList.contains('active'));
+  document.getElementById('p-synthese').classList.remove('hidden');
+  window.print();
+  if(ongletActif && ongletActif.dataset.p !== 'synthese') tab(ongletActif.dataset.p);
 }
 
 /* ---------- actions ---------- */
