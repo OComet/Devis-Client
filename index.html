@@ -1,9 +1,10 @@
 <!DOCTYPE html>
+<h<!DOCTYPE html>
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Proto Process / Analyse dossier client — v1.2 — 24/07/2026</title>
+<title>Proto Process / Analyse dossier client — v1.3 — 24/07/2026</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tabler-icons/2.44.0/iconfont/tabler-icons.min.css">
 <style>
 :root{
@@ -156,7 +157,7 @@ pre.txt{background:var(--surface2);border:1px solid var(--border);border-radius:
     <span class="logo-text"><span class="lt">PROTO PROCESS</span><span class="ls">/</span><span class="lo">Analyse dossier client</span></span>
   </div>
   <div class="spacer"></div>
-  <span class="hdr-note" id="hdr-version">v1.2 — 24/07/2026</span>
+  <span class="hdr-note" id="hdr-version">v1.3 — 24/07/2026</span>
   <span class="hdr-note" id="hdr-mode" style="margin-left:10px">mode test</span>
   <button class="btn-s" onclick="toggleConfig()"><i class="ti ti-settings"></i> Réglages</button>
 </header>
@@ -786,8 +787,8 @@ function synthDossier(d){
       </div></div>`;
   }
   h += `</div>`;
-  const LIB_AUTRES = { specs:'spécifications', documents_a_lire:'autres documents', mails:'mails', autres:'fichiers divers' };
-  const autres = Object.keys(inv).filter(k=>!['gerbers','bom','pick_and_place','plans'].includes(k) && (inv[k]||[]).length);
+  const LIB_AUTRES = { specs:'spécifications', mails:'mails du client' };
+  const autres = Object.keys(LIB_AUTRES).filter(k=>(inv[k]||[]).length);
   if(autres.length){
     const infoBadge = `<span style="display:inline-flex;align-items:center;justify-content:center;width:19px;height:19px;border-radius:4px;background:var(--pink-bg);color:var(--pink-badge);font-weight:700;font-size:12px;line-height:1;flex:none">i</span>`;
     h += `<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">
@@ -802,10 +803,32 @@ function synthDossier(d){
   }
   h += `</div>`;
 
-  // exigences
-  const ex = (d.exigences_montage||[]).concat(d.autres_exigences||[]);
-  if(ex.length) h += `<div class="card"><h2><i class="ti ti-tool"></i> Exigences relevées</h2>
-    <ul class="li">${ex.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>`;
+  // exigences de montage : colonnes, pastille d'alerte sur les operations speciales
+  const exi = (d.exigences_montage||[]).map(x =>
+    (x && typeof x === 'object')
+      ? { texte: x.exigence||'', attention: x.importance==='attention', document: x.document||'', emplacement: x.emplacement||'' }
+      : { texte: String(x), attention: false, document: '', emplacement: '' });
+  if(exi.length){
+    const nbAtt = exi.filter(x=>x.attention).length;
+    const alerteP = `<span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:4px;background:var(--amber-bg);color:var(--amber-badge);font-weight:700;font-size:12px;line-height:1;flex:none">!</span>`;
+    const neutreP = `<span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:4px;background:var(--surface2);color:var(--text3);font-weight:700;font-size:11px;line-height:1;flex:none">·</span>`;
+    h += `<div class="card"><h2><i class="ti ti-tool"></i> Exigences de montage
+        ${nbAtt?`<span class="badge b-warn">${nbAtt} à chiffrer</span>`:''}</h2>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:4px 18px">`;
+    // les points d'attention d'abord : ce sont eux qui coutent
+    exi.sort((a,b)=>(b.attention?1:0)-(a.attention?1:0));
+    exi.forEach(x=>{
+      h += `<div style="display:flex;align-items:flex-start;gap:9px;padding:5px 0;border-bottom:1px solid var(--border)">
+        ${x.attention?alerteP:neutreP}
+        <div style="flex:1;min-width:0">
+          <div style="font-size:12.5px;${x.attention?'font-weight:500':'color:var(--text2)'}">${esc(x.texte)}</div>
+          ${x.document?`<div style="font-size:11px;color:var(--text3);margin-top:1px">${esc(x.document)}${x.emplacement?' — '+esc(x.emplacement):''}</div>`:''}
+        </div></div>`;
+    });
+    h += `</div></div>`;
+  }
+  if((d.autres_exigences||[]).length) h += `<div class="card"><h2><i class="ti ti-note"></i> Autres exigences</h2>
+    <ul class="li">${d.autres_exigences.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>`;
 
   // sources : check-list des parametres attendus, trouves ou non
   const CHECKLIST = [
