@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Proto Process / Analyse dossier client — v1.0 — 24/07/2026</title>
+<title>Proto Process / Analyse dossier client — v1.2 — 24/07/2026</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tabler-icons/2.44.0/iconfont/tabler-icons.min.css">
 <style>
 :root{
@@ -156,7 +156,7 @@ pre.txt{background:var(--surface2);border:1px solid var(--border);border-radius:
     <span class="logo-text"><span class="lt">PROTO PROCESS</span><span class="ls">/</span><span class="lo">Analyse dossier client</span></span>
   </div>
   <div class="spacer"></div>
-  <span class="hdr-note" id="hdr-version">v1.0 — 24/07/2026</span>
+  <span class="hdr-note" id="hdr-version">v1.2 — 24/07/2026</span>
   <span class="hdr-note" id="hdr-mode" style="margin-left:10px">mode test</span>
   <button class="btn-s" onclick="toggleConfig()"><i class="ti ti-settings"></i> Réglages</button>
 </header>
@@ -838,18 +838,6 @@ function synthDossier(d){
         </div>
       </div></div>`;
   }
-  // ce qui a ete trouve hors check-list (client, ref projet, demande...)
-  const horsListe = srcFusion.filter(s=>!CHECKLIST.some(([,lbl])=>lbl===s.champ));
-  if(horsListe.length){
-    h += `<div style="margin-top:10px;padding-top:9px;border-top:1px solid var(--border2)">
-      <div style="font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--text3);margin-bottom:6px">Autres informations relevées</div>`;
-    horsListe.forEach(s=>{
-      h += `<div style="display:flex;align-items:flex-start;gap:9px;padding:3px 0">
-        ${okP}<div style="min-width:150px;font-size:12.5px">${esc(s.champ)}</div>
-        <div style="flex:1;min-width:0;font-size:11.5px;color:var(--text2)">${esc(s.document)}${s.emplacement?' — '+esc(s.emplacement):''}</div></div>`;
-    });
-    h += `</div>`;
-  }
   h += `</div></div>`;
 
   // questions
@@ -1002,7 +990,14 @@ function brut(d){
 /* ---------- export PDF ---------- */
 function exporterPdf(){
   const d = DATA || {};
-  const titre = [d.client || d.client_detecte || 'Client non précisé', d.ref_projet || ''].filter(Boolean).join(' — ');
+  const ref = d.ref_projet || d.ref_projet_detectee || '';
+  const client = d.client || d.client_detecte || '';
+  const titre = 'PP analyse' + (ref ? ' ' + ref : '');
+
+  // le nom du fichier propose au telechargement reprend le titre du document
+  const titreOrigine = document.title;
+  document.title = titre;
+
   document.getElementById('print-entete').innerHTML =
     `<div style="display:flex;align-items:baseline;gap:10px">
        <strong style="font-size:15pt">PROTO PROCESS</strong>
@@ -1010,7 +1005,8 @@ function exporterPdf(){
        <span style="flex:1"></span>
        <span style="font-size:9pt">${esc(new Date().toLocaleString('fr-FR'))}</span>
      </div>
-     <div style="font-size:12pt;margin-top:3px">${esc(titre)}</div>`;
+     <div style="font-size:13pt;margin-top:4px"><strong>${esc(titre)}</strong></div>
+     ${client?`<div style="font-size:11pt;margin-top:2px">${esc(client)}</div>`:''}`;
 
   // lignes de nomenclature a problemes uniquement
   const lignes = (d.bom_lignes || d.lignes || []).filter(l =>
@@ -1045,6 +1041,7 @@ function exporterPdf(){
   const ongletActif = [...document.querySelectorAll('.tab')].find(t=>t.classList.contains('active'));
   document.getElementById('p-synthese').classList.remove('hidden');
   window.print();
+  document.title = titreOrigine;
   if(ongletActif && ongletActif.dataset.p !== 'synthese') tab(ongletActif.dataset.p);
 }
 
