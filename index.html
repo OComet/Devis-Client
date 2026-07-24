@@ -441,6 +441,9 @@ async function analyser(){
     appliquerDetections();
     replier();
     afficher();
+    // second appel : traitement de la nomenclature, separe pour ne pas
+    // depasser le temps de reponse d'un webhook sur une grosse BOM
+    if(!modeBom && (DATA.bom_rows||[]).length) traiterBom();
   }catch(e){
     const m = /load failed|failed to fetch|networkerror/i.test(e.message)
       ? "Appel bloqué par le navigateur ou workflow non démarré. Vérifiez que le workflow tourne dans n8n (bouton « Test workflow ») ou publiez-le."
@@ -488,6 +491,37 @@ function tab(p){
     document.getElementById('p-'+x).classList.toggle('hidden', x!==p));
 }
 
+async function traiterBom(){
+  const c = cfg();
+  const zone = document.getElementById('p-bom');
+  zone.innerHTML = `<div class="card"><h2><i class="ti ti-table"></i> Nomenclature</h2>
+    <p style="color:var(--text2)"><span class="spin"></span>
+    Traitement de ${DATA.bom_nb_lignes} lignes en cours… cela peut prendre une a deux minutes.</p>
+    <p class="hint">La fiche de dossier est deja consultable dans l'onglet Synthese.</p></div>`;
+  try{
+    const r = await fetch(`${c.base}/${c.mode}/bom-client-ingestion`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ client: DATA.client || '', rows: DATA.bom_rows })
+    });
+    const t = await r.text();
+    if(!r.ok) throw new Error('HTTP '+r.status+' — '+t.slice(0,180));
+    const b = JSON.parse(t);
+    const bd = Array.isArray(b) ? (b[0]||{}) : b;
+    DATA.bom_lignes = bd.lignes || [];
+    DATA.bom_totaux = bd.totaux || null;
+    DATA.bom_controles_luminovo = bd.controles_luminovo || [];
+    DATA.bom_fiche_texte = bd.fiche_texte || '';
+    DATA.bom_xlsx_nom = bd.bom_xlsx_nom || null;
+    DATA.bom_xlsx_base64 = bd.bom_xlsx_base64 || null;
+    zone.innerHTML = tableBom(DATA);
+    document.getElementById('p-brut').innerHTML = brut(DATA);
+  }catch(e){
+    zone.innerHTML = `<div class="card err"><h2><i class="ti ti-table"></i> Nomenclature</h2>
+      <p style="color:var(--red)">${esc(e.message)}</p>
+      <button class="btn-s" onclick="traiterBom()"><i class="ti ti-refresh"></i> Reessayer</button></div>`;
+  }
+}
+
 /* ---------- rendu ---------- */
 function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m])); }
 
@@ -503,7 +537,9 @@ function afficher(){
   const d = DATA || {};
   const estDossier = d.decision_pcb !== undefined;
   document.getElementById('p-synthese').innerHTML = estDossier ? synthDossier(d) : synthBom(d);
-  document.getElementById('p-bom').innerHTML = tableBom(d);
+  document.getElementById('p-bom').innerHTML = (d.bom_rows && d.bom_rows.length && !(d.bom_lignes||[]).length)
+    ? `<div class="card"><h2><i class="ti ti-table"></i> Nomenclature</h2><p style="color:var(--text2)"><span class="spin"></span> Traitement en cours…</p></div>`
+    : tableBom(d);
   document.getElementById('p-brut').innerHTML = brut(d);
   tab('synthese');
 }
