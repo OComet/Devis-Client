@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Proto Process / Analyse dossier client — v0.8 — 24/07/2026</title>
+<title>Proto Process / Analyse dossier client — v0.9 — 24/07/2026</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tabler-icons/2.44.0/iconfont/tabler-icons.min.css">
 <style>
 :root{
@@ -135,7 +135,7 @@ pre.txt{background:var(--surface2);border:1px solid var(--border);border-radius:
     <span class="logo-text"><span class="lt">PROTO PROCESS</span><span class="ls">/</span><span class="lo">Analyse dossier client</span></span>
   </div>
   <div class="spacer"></div>
-  <span class="hdr-note" id="hdr-version">v0.8 — 24/07/2026</span>
+  <span class="hdr-note" id="hdr-version">v0.9 — 24/07/2026</span>
   <span class="hdr-note" id="hdr-mode" style="margin-left:10px">mode test</span>
   <button class="btn-s" onclick="toggleConfig()"><i class="ti ti-settings"></i> Réglages</button>
 </header>
@@ -595,7 +595,11 @@ async function traiterBom(rows, client){
   try{
     const r = await fetch(`${c.base}/${c.mode}/bom-client-ingestion`, {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ client: client, rows: rows })
+      body: JSON.stringify({
+        client: client, rows: rows,
+        nom_fichier_bom: DATA.bom_fichier_source || null,
+        entetes: DATA.bom_entetes || []
+      })
     });
     const t = await r.text();
     if(!r.ok) throw new Error('HTTP '+r.status+' \u2014 '+t.slice(0,180));
@@ -665,7 +669,8 @@ const LIBELLE_CHAMP = {
   vias_borgnes:'Vias borgnes', vias_enterres:'Vias enterrés', epaisseur_mm:'Épaisseur', finition:'Finition',
   materiau:'Matériau', classe_ipc:'Classe IPC', impedance_controlee:'Impédance contrôlée', vernis_epargne:'Vernis épargne',
   'demande.quantites':'Quantités', 'demande.delai_souhaite':'Délai souhaité', 'demande.type_prestation':'Prestation',
-  'demande.consignation':'Consignation', autres_exigences:'Autres exigences'
+  'demande.consignation':'Consignation', autres_exigences:'Autres exigences',
+  dimensions:'Dimensions (L × H)'
 };
 function fusionnerSources(sources){
   const s = sources.slice();
@@ -674,7 +679,7 @@ function fusionnerSources(sources){
     const L = s[iL], H = s[iH];
     const meme = L.document===H.document && L.emplacement===H.emplacement;
     s.splice(Math.max(iL,iH),1); s.splice(Math.min(iL,iH),1,{
-      champ:'dimensions (L x H)', document: L.document,
+      champ:'Dimensions (L × H)', document: L.document,
       emplacement: meme ? L.emplacement : [L.emplacement,H.emplacement].filter(Boolean).join(' ; ')
     });
   }
@@ -760,18 +765,47 @@ function synthDossier(d){
   if(ex.length) h += `<div class="card"><h2><i class="ti ti-tool"></i> Exigences relevées</h2>
     <ul class="li">${ex.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>`;
 
-  // sources
-  if((d.sources||[]).length) h += `<div class="card"><h2><i class="ti ti-search"></i> Sources</h2>
-    <table style="width:100%;border-collapse:collapse">
-      <thead><tr>
-        <th style="text-align:left;font-size:10.5px;text-transform:uppercase;color:var(--text3);padding:5px 8px;border-bottom:1px solid var(--border2)">Champ</th>
-        <th style="text-align:left;font-size:10.5px;text-transform:uppercase;color:var(--text3);padding:5px 8px;border-bottom:1px solid var(--border2)">Où vérifier</th>
-      </tr></thead>
-      <tbody>${fusionnerSources(d.sources).map(s=>
-        `<tr><td style="padding:6px 8px;border-bottom:1px solid var(--border);font-weight:500;white-space:nowrap;vertical-align:top">${esc(s.champ)}</td>
-         <td style="padding:6px 8px;border-bottom:1px solid var(--border);color:var(--text2)">${esc(s.document)}${s.emplacement?' — '+esc(s.emplacement):''}</td></tr>`
-      ).join('')}</tbody>
-    </table></div>`;
+  // sources : check-list des parametres attendus, trouves ou non
+  const CHECKLIST = [
+    ['couches','Couches'], ['epaisseur_mm','Épaisseur'], ['dimensions','Dimensions (L × H)'],
+    ['percage_mini_mm','Perçage mini'], ['piste_mini_um','Piste mini'], ['isolement_mini_um','Isolement mini'],
+    ['vias_borgnes','Vias borgnes'], ['vias_enterres','Vias enterrés'],
+    ['finition','Finition'], ['materiau','Matériau'], ['classe_ipc','Classe IPC'],
+    ['impedance_controlee','Impédance contrôlée'], ['vernis_epargne','Vernis épargne']
+  ];
+  const srcFusion = fusionnerSources(d.sources||[]);
+  const parLibelle = {};
+  srcFusion.forEach(s => { parLibelle[s.champ] = s; });
+
+  const okP = `<span style="display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:4px;background:var(--green-bg);color:var(--green-badge);font-weight:700;font-size:11px;line-height:1;flex:none">&#10003;</span>`;
+  const koP = `<span style="display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:4px;background:var(--red-bg);color:var(--red-badge);font-weight:700;font-size:11px;line-height:1;flex:none">&#10007;</span>`;
+
+  const trouves = CHECKLIST.filter(([,lbl])=>parLibelle[lbl]).length;
+  h += `<div class="card"><h2><i class="ti ti-list-check"></i> Sources
+      <span class="badge ${trouves===CHECKLIST.length?'b-ok':'b-warn'}">${trouves} / ${CHECKLIST.length} trouvés</span></h2>
+    <div style="display:flex;flex-direction:column;gap:5px">`;
+  for(const [,lbl] of CHECKLIST){
+    const s = parLibelle[lbl];
+    h += `<div style="display:flex;align-items:flex-start;gap:9px;padding:3px 0;border-bottom:1px solid var(--border)">
+      ${s?okP:koP}
+      <div style="min-width:150px;font-size:12.5px">${esc(lbl)}</div>
+      <div style="flex:1;min-width:0;font-size:11.5px;color:${s?'var(--text2)':'var(--text3)'}">
+        ${s ? esc(s.document) + (s.emplacement?' — '+esc(s.emplacement):'') : 'non trouvé dans le dossier'}
+      </div></div>`;
+  }
+  // ce qui a ete trouve hors check-list (client, ref projet, demande...)
+  const horsListe = srcFusion.filter(s=>!CHECKLIST.some(([,lbl])=>lbl===s.champ));
+  if(horsListe.length){
+    h += `<div style="margin-top:10px;padding-top:9px;border-top:1px solid var(--border2)">
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--text3);margin-bottom:6px">Autres informations relevées</div>`;
+    horsListe.forEach(s=>{
+      h += `<div style="display:flex;align-items:flex-start;gap:9px;padding:3px 0">
+        ${okP}<div style="min-width:150px;font-size:12.5px">${esc(s.champ)}</div>
+        <div style="flex:1;min-width:0;font-size:11.5px;color:var(--text2)">${esc(s.document)}${s.emplacement?' — '+esc(s.emplacement):''}</div></div>`;
+    });
+    h += `</div>`;
+  }
+  h += `</div></div>`;
 
   // questions
   if((d.questions_client||[]).length) h += `<div class="card warn"><h2><i class="ti ti-message-question"></i> À clarifier avec le client</h2>
@@ -825,14 +859,18 @@ function tableBom(d){
 
   const lignes = toutes.filter(l=>correspondFiltre(l,BOM_FILTER));
   h += `<div class="tblwrap"><table><thead><tr>
-    <th>Repères</th><th>Famille</th><th>Valeur</th><th>Boîtier</th>
+    <th>Repères</th><th>Description client</th><th>Famille</th><th>Valeur</th><th>Boîtier</th>
     <th>MPN client</th><th>IPN proposé</th><th>Statut</th><th>Confiance</th></tr></thead><tbody>`;
-  if(!lignes.length) h += `<tr><td colspan="8" style="color:var(--text3);text-align:center;padding:20px">Aucune ligne pour ce filtre.</td></tr>`;
+  if(!lignes.length) h += `<tr><td colspan="9" style="color:var(--text3);text-align:center;padding:20px">Aucune ligne pour ce filtre.</td></tr>`;
   for(const l of lignes){
     const st = statutLigne(l);
     const cellCls = st.niveau==='err'?'errcell':st.niveau==='warn'?'warncell':'';
+    const desc = l.description_client
+      ? `<span title="${esc(l.description_client)}">${esc(l.description_client)}</span>`
+      : `<span style="color:var(--text3);font-style:italic">pas de description</span>`;
     h += `<tr>
       <td class="${cellCls} mono">${esc((l.designateurs||[]).join(', ')|| ('ligne '+((l.ligne_index??0)+1)))}</td>
+      <td style="max-width:280px;font-size:11.5px;color:var(--text2)">${desc}</td>
       <td>${esc(l.famille||'')}</td>
       <td class="mono">${esc(l.valeur||'')}</td>
       <td class="mono">${esc(l.boitier||'')}</td>
