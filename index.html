@@ -1,10 +1,9 @@
 <!DOCTYPE html>
-<h<!DOCTYPE html>
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Proto Process / Analyse dossier client — v1.3 — 24/07/2026</title>
+<title>Proto Process / Analyse dossier client — v1.4 — 25/07/2026</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tabler-icons/2.44.0/iconfont/tabler-icons.min.css">
 <style>
 :root{
@@ -157,7 +156,7 @@ pre.txt{background:var(--surface2);border:1px solid var(--border);border-radius:
     <span class="logo-text"><span class="lt">PROTO PROCESS</span><span class="ls">/</span><span class="lo">Analyse dossier client</span></span>
   </div>
   <div class="spacer"></div>
-  <span class="hdr-note" id="hdr-version">v1.3 — 24/07/2026</span>
+  <span class="hdr-note" id="hdr-version">v1.4 — 25/07/2026</span>
   <span class="hdr-note" id="hdr-mode" style="margin-left:10px">mode test</span>
   <button class="btn-s" onclick="toggleConfig()"><i class="ti ti-settings"></i> Réglages</button>
 </header>
@@ -283,6 +282,15 @@ pre.txt{background:var(--surface2);border:1px solid var(--border);border-radius:
 </div>
 
 <script>
+/* ---------- version ---------- */
+// Convention : X = nouvelle fonctionnalite, Y = correctif / reglage.
+// Un seul endroit a modifier a chaque mise a jour ; se repercute
+// automatiquement dans le titre d'onglet et le badge d'en-tete.
+const APP_VERSION = "1.4";
+const APP_DATE = "25/07/2026";
+document.title = `Proto Process / Analyse dossier client — v${APP_VERSION} — ${APP_DATE}`;
+document.getElementById('hdr-version').textContent = `v${APP_VERSION} — ${APP_DATE}`;
+
 let FILES = [];
 let DATA = null;
 let ANALYSE_ID = 0;   // incremente a chaque nouvelle analyse : invalide les boucles precedentes
